@@ -1,3 +1,11 @@
+.vscode
+.mypy_cache
+cache
+data
+model_cache
+output
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

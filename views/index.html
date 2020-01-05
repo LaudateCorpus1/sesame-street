@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <style>
+        .row{
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .badge{
+            margin: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <form method="POST">
+                <fieldset class="form-group">
+                    <div class="row">
+                      <legend class="col-form-label col-sm-2 pt-0">Task</legend>
+                      <div class="col-sm-10">
+                          % for t in tasks:
+                          <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="radio" name="task" id="{{t}}" value="{{t}}" {{"checked" if task == t else ""}}>
+                              <label class="form-check-label" for="{{t}}">
+                              {{t}}
+                              </label>
+                          </div>
+                          % end
+                      </div>
+                    </div>
+
+                </fieldset>
+                <fieldset class="form-group">
+                    % for model in models:
+                  <div class="row">
+                    <legend class="col-form-label col-sm-2 pt-0">{{model}}</legend>
+                    <div class="col-sm-10">
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="{{model}}" id="{{model}}-correct" value="correct" {{"checked" if filters.get(model) == 'correct' else ""}}>
+                        <label class="form-check-label" for="{{model}}-correct">
+                          Correct
+                        </label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="{{model}}" id="{{model}}-wrong" value="wrong" {{"checked" if filters.get(model) == 'wrong' else ""}}>
+                        <label class="form-check-label" for="{{model}}-wrong">
+                          Wrong
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  % end
+                </fieldset>
+                <fieldset class="form-group">
+
+                  <div class="row">
+                    <legend class="col-form-label col-sm-2 pt-0">Embedder</legend>
+                    <div class="col-sm-10">
+                        % for e in embedders:
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="embedder" id="{{e}}" value="{{e}}" {{"checked" if embedder == e else ""}}>
+                            <label class="form-check-label" for="{{e}}">
+                            {{e}}
+                            </label>
+                        </div>
+                        % end
+                    </div>
+                  </div>
+
+                </fieldset>
+                <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        <div class="row">
+            <div id="heatmap" style="height: 500px; width: 100%;"></div>
+        </div>
+
+        <div class="row" id="examples" style="height: 800px; overflow-x: scroll;">
+            % for example in result:
+            <div class="col-lg-6">
+                <div class="card" id="example-{{example}}">
+                  <div class="card-body">
+                    <h5 class="card-title">{{result[example]['ctx']}}</h5>
+                    % for choice in result[example]['choices']:
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <p class="card-text"> - {{choice['text']}}</p>
+                        </div>
+                        <div class="col-lg-6">
+                            % for model in choice['models']:
+                            <button type="button" class="btn btn-outline-{{'success' if model['margin'] == '-' else 'danger'}}">{{model['model']}}<span class="badge badge-light" >{{'✔️' if model['margin'] == '-' else '{:.2f}'.format(model['margin'])}}</span></button>
+                            % end
+                        </div>
+                    </div>
+                    <br>
+                    % end
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="card">
+                  <div class="card-body">
+                    <h5 class="card-title">Closest Training Pairs</h5>
+                    % for choice in result[example]['choices']:
+                        % if choice['models']:
+                            % for model in choice['models']:
+
+                                % for e in model['closest'][:1]:
+                                <div class="card text-white bg-{{'success' if e['choice']['correct'] else 'danger'}}">
+                                    <div class="card-header">{{model['model']}}</div>
+                                    <div class="card-body">
+                                      <h5 class="card-title">{{e['ctx']}}</h5>
+                                      <p class="card-text"> - {{e['choice']['text']}}</p>
+                                    </div>
+                                </div>
+                                % end
+                            % end
+                        % end
+                    % end
+                  </div>
+                </div>
+              </div>
+            % end
+        </div>
+
+      </div>
+
+</body>
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@4.6.0/dist/echarts.js"></script>
+<script>
+
+
+    var heatmap_data = {{!margins}};
+    console.log(heatmap_data);
+
+    var myChart = echarts.init(document.getElementById('heatmap'));
+    var xData = [...Array({{!total}}).keys()];
+    var yData = {{!models}};
+
+    if(heatmap_data.length > 0){
+        option = {
+            title:{
+            show: true,
+            left: 'center',
+            text: "Error margin heatmap visualization on dev examples"
+            },
+            tooltip: {
+                position: 'top'
+            },
+            animation: false,
+            grid: {
+                height: '50%',
+                top: '10%'
+            },
+            xAxis: {
+                type: 'category',
+                data: xData,
+                splitArea: {
+                    show: false
+                }
+            },
+            yAxis: {
+                type: 'category',
+                data: yData,
+                splitArea: {
+                    show: true
+                }
+            },
+            visualMap: {
+                min: 0,
+                max: 1,
+                calculable: true,
+                orient: 'horizontal',
+                left: 'center',
+                bottom: '15%'
+            },
+            dataZoom: [
+                    {
+                        type: 'slider',
+                        xAxisIndex: 0,
+                        start: 10,
+                        end: 60
+                    },
+                    {
+                        type: 'inside',
+                        xAxisIndex: 0,
+                        start: 10,
+                        end: 60
+                    },
+                    {
+                        type: 'slider',
+                        yAxisIndex: 0,
+                        start: 30,
+                        end: 80
+                    },
+                    {
+                        type: 'inside',
+                        yAxisIndex: 0,
+                        start: 30,
+                        end: 80
+                    }
+                ],
+            series: [{
+                name: 'Dev',
+                type: 'heatmap',
+                data: heatmap_data,
+                label: {
+                    show: false
+                },
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                    }
+                }
+            }]
+        };
+        myChart.setOption(option);
+        myChart.on('click', params => {
+
+            var topPos = $('#example-' + params.name).offset().top;
+
+            $('#examples').scrollTop(topPos - 100);
+
+        });
+    }
+</script>
+</html>
