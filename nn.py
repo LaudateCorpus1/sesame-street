@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Nearest Neighbor Tool")
     parser.add_argument("--model", choices=["roberta", "xlnet", "bert"], required=True)
-    parser.add_argument("--task", choices=["alphanli", "hellaswag", "piqa", "siqa"], required=True)
+    parser.add_argument("--task", choices=["alphanli", "hellaswag", "physicaliqa", "socialiqa"], required=True)
     parser.add_argument("--embedder", choices=["ai2", "st"], required=True)
     parser.add_argument("--output", type=str, required=True)
 

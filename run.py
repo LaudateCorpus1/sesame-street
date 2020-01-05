@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from nn import *
 from config import *
+from loguru import logger
 
 bottle.TEMPLATE_PATH.insert(0, 'views')
 
@@ -20,7 +21,7 @@ def send_static(filename):
 def index():
     return template(
         'index.html',
-        tasks=['alphanli', 'hellaswag', 'piqa', 'siqa'],
+        tasks=['alphanli', 'hellaswag', 'physicaliqa', 'socialiqa'],
         models=['roberta', 'bert', 'xlnet'],
         embedders=['ai2', 'st'],
         filters={},
@@ -34,7 +35,7 @@ def index():
 
 @route('/', method='POST')
 def retrieve():
-    print(request.forms.__dict__)
+    logger.info(f"Request: {request.forms.__dict__}")
     task = request.forms.get('task')
     embedder = request.forms.get('embedder')
 
@@ -43,7 +44,7 @@ def retrieve():
     for model in ['roberta', 'bert', 'xlnet']:
         if request.forms.get(model, None) is not None:
             filters[model] = request.forms.get(model, None)
-    print(filters)
+    logger.info(f"Filters: {filters}")
 
     margins = heatmap(filters, task)
     train_dataset, dev_dataset = load_dataset(task)
@@ -74,7 +75,7 @@ def retrieve():
 
     return template(
         'index.html',
-        tasks=['alphanli', 'hellaswag', 'piqa', 'siqa'],
+        tasks=['alphanli', 'hellaswag', 'physicaliqa', 'socialiqa'],
         models=['roberta', 'bert', 'xlnet'],
         embedders=['ai2', 'st'],
         filters=filters,
@@ -111,7 +112,7 @@ def heatmap(filters, task):
         margin = []
         for j, (pred, prob, label) in enumerate(zip(preds, probablities, labels)):
             margin.append([j, i, "-"] if pred == label else [j, i, prob[pred - datasets[task]["offset"]] - prob[label - datasets[task]["offset"]]])
-        print(sum( 1 if x[-1] == "-" else 0 for x in margin) / len(margin))
+        logger.info(f"Model {model} accuracy: {sum( 1 if x[-1] == '-' else 0 for x in margin) / len(margin)}")
         margins.extend(margin)
     return margins
 
@@ -120,7 +121,7 @@ def get_closest(filters, task, embedder):
     results = []
 
     for i, model in enumerate(filters):
-        print(closest_indices[task][model][embedder])
+        # print(closest_indices[task][model][embedder])
         results.append(np.loadtxt(closest_indices[task][model][embedder]))
 
     return results
