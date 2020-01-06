@@ -46,17 +46,23 @@ def retrieve():
             filters[model] = request.forms.get(model, None)
     logger.info(f"Filters: {filters}")
 
-    margins = heatmap(filters, task)
-    train_dataset, dev_dataset = load_dataset(task)
+    order = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
 
-    valid_indices = filtering(filters, task)
+    train_dataset, dev_dataset = load_dataset(task, order=order)
+
+    if filters == {}:
+        filters = {m: None for m in ['roberta', 'bert', 'xlnet']}
+        valid_indices = list(range(len(dev_dataset)))
+    else:
+        valid_indices = filtering(filters, task, order=order)
+
+    margins = heatmap(filters, task, order)
+
     result = {}
-    closest = get_closest(filters, task, embedder)
-
-
+    closest = get_closest(filters, task, embedder, order=order)
 
     for i, model in enumerate(filters):
-        preds, probs, labels = load_predictions(predictions[model][task])
+        preds, probs, labels = load_predictions(predictions[model][task], order=order)
         for j, (pred, prob, label) in enumerate(zip(preds, probs, labels)):
             if j not in valid_indices: continue
             if j not in result:
@@ -87,13 +93,13 @@ def retrieve():
     )
 
 
-def filtering(filters, task):
+def filtering(filters, task, order=None):
 
     valid_indices = set()
 
     for j, model in enumerate(filters):
         model_indices = set()
-        preds, probs, labels = load_predictions(predictions[model][task])
+        preds, probs, labels = load_predictions(predictions[model][task], order=order)
 
         for i, (pred, prob, label) in enumerate(zip(preds, probs, labels)):
 
@@ -104,27 +110,41 @@ def filtering(filters, task):
         valid_indices = model_indices if j == 0 else valid_indices.intersection(model_indices)
     return valid_indices
 
-def heatmap(filters, task):
+def heatmap(filters, task, order=None, flatten=True):
 
     margins = []
     for i, model in enumerate(filters):
-        preds, probablities, labels = load_predictions(predictions[model][task])
+        preds, probablities, labels = load_predictions(predictions[model][task], order=order)
         margin = []
         for j, (pred, prob, label) in enumerate(zip(preds, probablities, labels)):
             margin.append([j, i, "-"] if pred == label else [j, i, prob[pred - datasets[task]["offset"]] - prob[label - datasets[task]["offset"]]])
         logger.info(f"Model {model} accuracy: {sum( 1 if x[-1] == '-' else 0 for x in margin) / len(margin)}")
-        margins.extend(margin)
+        if flatten:
+            margins.extend(margin)
+        else:
+            margins.append(margin)
     return margins
 
-def get_closest(filters, task, embedder):
+def get_closest(filters, task, embedder, order=None):
 
     results = []
 
     for i, model in enumerate(filters):
-        # print(closest_indices[task][model][embedder])
-        results.append(np.loadtxt(closest_indices[task][model][embedder]))
+        if order is None:
+            results.append(np.loadtxt(closest_indices[task][model][embedder]))
+        else:
+            rank = np.loadtxt(closest_indices[task][model][embedder])
+            results.append(rank[order, :])
 
     return results
+
+def get_order(filters, task):
+
+    margins = heatmap(filters, task, None, flatten=False)
+    order = [i for i in range(len(margins[0]))]
+    order = sorted(order, key=lambda j: sum(1 if c[j][-1] == '-' else 0 for c in margins))
+
+    return order
 
 if __name__ == "__main__":
     run(host='localhost', port=7777, reloader=True)

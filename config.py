@@ -83,8 +83,8 @@ datasets = {
         "ctx": lambda x: x["context"] + "\n" + x['question'],
         "choices": lambda x: [
             {"text": x["answerA"], "models": [], "correct": False},
-            {"text": x["answerA"], "models": [], "correct": False},
             {"text": x["answerB"], "models": [], "correct": False},
+            {"text": x["answerC"], "models": [], "correct": False},
         ],
         "num_choices": 3
     }

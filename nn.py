@@ -8,7 +8,7 @@ from config import *
 
 
 
-def load_dataset(task_name):
+def load_dataset(task_name, order=None):
     assert task_name in datasets, "task not found"
 
     with open(datasets[task_name]["labels"]["train"]) as tf, open(datasets[task_name]["labels"]["dev"]) as df:
@@ -36,9 +36,12 @@ def load_dataset(task_name):
     train_dataset = list(map(process, zip(train_dataset, train_labels)))
     dev_dataset = list(map(process, zip(dev_dataset, dev_labels)))
 
+    if order is not None:
+        dev_dataset = [dev_dataset[i] for i in order]
+
     return train_dataset, dev_dataset
 
-def load_predictions(path):
+def load_predictions(path, order=None):
 
     with open(os.path.join(path, "dev-predictions.lst")) as predfile, \
         open(os.path.join(path, "dev-probabilities.lst")) as probafile, \
@@ -47,6 +50,11 @@ def load_predictions(path):
             labels = list(map(int, labelfile.readlines()))
             predictions = list(map(int, predfile.readlines()))
             probabilities = list(map(lambda l: list(map(float, l.split('\t'))), probafile.readlines()))
+
+    if order is not None:
+        labels = [labels[i] for i in order]
+        predictions = [predictions[i] for i in order]
+        probabilities = [probabilities[i] for i in order]
 
     return predictions, probabilities, labels
 
