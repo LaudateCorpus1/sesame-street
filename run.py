@@ -2,6 +2,7 @@ from bottle import route, run, template, static_file, request
 import bottle
 import os
 import json
+import math
 from collections import defaultdict
 from nn import *
 from config import *
@@ -11,13 +12,14 @@ bottle.TEMPLATE_PATH.insert(0, 'views')
 
 # pylint: disable=no-member
 
+app = application = bottle.Bottle()
 
-@route('/<filename:path>')
+@app.route('/<filename:path>')
 def send_static(filename):
     return static_file(filename, root='static/')
 
 
-@route('/', method='GET')
+@app.route('/', method='GET')
 def index():
     return template(
         'index.html',
@@ -33,7 +35,7 @@ def index():
     )
 
 
-@route('/', method='POST')
+@app.route('/', method='POST')
 def retrieve():
     logger.info(f"Request: {request.forms.__dict__}")
     task = request.forms.get('task')
@@ -46,7 +48,7 @@ def retrieve():
             filters[model] = request.forms.get(model, None)
     logger.info(f"Filters: {filters}")
 
-    order = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
+    order, flattened = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
 
     train_dataset, dev_dataset = load_dataset(task, order=order)
 
@@ -59,21 +61,24 @@ def retrieve():
     margins = heatmap(filters, task, order)
 
     result = {}
-    closest = get_closest(filters, task, embedder, order=order)
+    closest = get_closest(filters, task, embedder, order=flattened)
 
     for i, model in enumerate(filters):
         preds, probs, labels = load_predictions(predictions[model][task], order=order)
         for j, (pred, prob, label) in enumerate(zip(preds, probs, labels)):
+            # print(j)
             if j not in valid_indices: continue
             if j not in result:
                 result[j] = dev_dataset[j]
+            # print(closest[i][j * datasets[task]["num_choices"] + pred - datasets[task]["offset"]])
+            # print(j * datasets[task]["num_choices"] + pred - datasets[task]["offset"])
             result[j]["choices"][pred - datasets[task]["offset"]]["models"].append({
                 "model": model,
                 "margin": "-" if pred == label else prob[pred - datasets[task]["offset"]] - prob[label - datasets[task]["offset"]],
                 "closest": [
                     {
-                        "ctx": train_dataset[int(x) // datasets[task]["num_choices"]]["ctx"],
-                        "choice": train_dataset[int(x) // datasets[task]["num_choices"]]["choices"][int(x) % datasets[task]["num_choices"]]
+                        "ctx": train_dataset[math.floor(int(x) / datasets[task]["num_choices"])]["ctx"],
+                        "choice": train_dataset[math.floor(int(x) / datasets[task]["num_choices"])]["choices"][int(x) % datasets[task]["num_choices"]]
                     } for x in closest[i][j * datasets[task]["num_choices"] + pred - datasets[task]["offset"]]
                 ]
             })
@@ -144,7 +149,13 @@ def get_order(filters, task):
     order = [i for i in range(len(margins[0]))]
     order = sorted(order, key=lambda j: sum(1 if c[j][-1] == '-' else 0 for c in margins))
 
-    return order
+    flatten_order = []
+
+    for x in order:
+
+        flatten_order.extend(list(range(x * datasets[task]["num_choices"], (x+1) * datasets[task]["num_choices"])))
+
+    return order, flatten_order
 
 if __name__ == "__main__":
-    run(host='localhost', port=7777, reloader=True)
+    run(app=app, host='localhost', port=7778, reloader=True)
