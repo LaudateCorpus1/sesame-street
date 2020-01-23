@@ -16,6 +16,7 @@ app = application = bottle.Bottle()
 
 @app.route('/<filename:path>')
 def send_static(filename):
+    # print(filename, static_file(filename, root='static/'))
     return static_file(filename, root='static/')
 
 
@@ -31,7 +32,8 @@ def index():
         embedder="ai2",
         result={},
         total=0,
-        margins=[]
+        margins=[],
+        all="all"
     )
 
 
@@ -95,8 +97,8 @@ def retrieve():
         result=result,
         total=len(dev_dataset),
         margins=margins,
+        all=request.forms.get("all")
     )
-
 
 def filtering(filters, task, order=None):
 
