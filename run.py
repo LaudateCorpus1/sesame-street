@@ -48,6 +48,9 @@ def retrieve():
     for model in ['roberta', 'bert', 'xlnet']:
         if request.forms.get(model, None) is not None:
             filters[model] = request.forms.get(model, None)
+        if request.forms.get(f"{model}-check", None) is not None:
+            filters[model] = filters.get(model, None)
+
     logger.info(f"Filters: {filters}")
 
     order, flattened = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
@@ -113,6 +116,8 @@ def filtering(filters, task, order=None):
             if pred == label and filters[model] == "correct":
                 model_indices.add(i)
             elif pred != label and filters[model] == "wrong":
+                model_indices.add(i)
+            elif filters[model] is None:
                 model_indices.add(i)
         valid_indices = model_indices if j == 0 else valid_indices.intersection(model_indices)
     return valid_indices

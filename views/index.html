@@ -158,6 +158,7 @@
             var overide = $("#all").prop("checked");
             if (overide){
                 $(".filter").prop("disabled", true)
+                $(".filter").prop("checked", false)
             }else{
                 $(".filter").prop("disabled", false)
                 var groups = $("#model-filters").find("div.row");
