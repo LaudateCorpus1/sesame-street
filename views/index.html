@@ -34,18 +34,38 @@
 
                 </fieldset>
                 <fieldset class="form-group">
-                    % for model in models:
+                    <div class="row">
+                      <legend class="col-form-label col-sm-2 pt-0"></legend>
+                      <div class="col-sm-10">
+
+                          <div class="form-check form-check-inline filter">
+                              <input class="form-check-input" type="checkbox" name="all" id="all" value="all" {{"checked" if all=="all" else ""}}>
+                              <label class="form-check-label" for="all">
+                              No filters, show all data
+                              </label>
+                          </div>
+
+                      </div>
+                    </div>
+
+                </fieldset>
+                <fieldset class="form-group" id="model-filters">
+                % for model in models:
                   <div class="row">
                     <legend class="col-form-label col-sm-2 pt-0">{{model}}</legend>
                     <div class="col-sm-10">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input filter" type="checkbox" name="{{model}}-check" id="{{model}}-check" value="{{model}}" {{"checked" if filters.get(model) in ('correct', 'wrong') else ""}}>
+                            <!-- <label class="form-check-label" for="{{model}}-check"></label> -->
+                          </div>
                       <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="{{model}}" id="{{model}}-correct" value="correct" {{"checked" if filters.get(model) == 'correct' else ""}}>
+                        <input class="form-check-input filter" type="radio" name="{{model}}" id="{{model}}-correct" value="correct" {{"checked" if filters.get(model) == 'correct' else ""}}>
                         <label class="form-check-label" for="{{model}}-correct">
                           Correct
                         </label>
                       </div>
                       <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="{{model}}" id="{{model}}-wrong" value="wrong" {{"checked" if filters.get(model) == 'wrong' else ""}}>
+                        <input class="form-check-input filter" type="radio" name="{{model}}" id="{{model}}-wrong" value="wrong" {{"checked" if filters.get(model) == 'wrong' else ""}}>
                         <label class="form-check-label" for="{{model}}-wrong">
                           Wrong
                         </label>
@@ -134,9 +154,73 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@4.6.0/dist/echarts.js"></script>
 <script>
 
+    function validate_checkbox(){
+            var overide = $("#all").prop("checked");
+            if (overide){
+                $(".filter").prop("disabled", true)
+                $(".filter").prop("checked", false)
+            }else{
+                $(".filter").prop("disabled", false)
+                var groups = $("#model-filters").find("div.row");
+                groups.each(function(i){
+                    var divs = $(this).find("div.form-check-inline");
+                    var model_checked = false;
+                    var option_checked = false;
+                    var model_name = "";
+
+                    divs.each(function(j){
+                        var inp = $($(this).find("input")[0]);
+                        // console.log(inp);
+                        // console.log(inp.prop("checked"));
+                        if(j == 0 && inp.prop("checked")){
+                            model_checked = true;
+
+                        }else if (j == 0){
+                            model_checked = false;
+
+                        }
+                        if(j!=0){
+                            model_name = inp.attr("name");
+                        }
+                        if(j!=0 && inp.prop("checked")){
+                            option_checked = true;
+
+                        }
+
+
+                    })
+                    console.log(model_name, model_checked, option_checked);
+                    // if(model_checked && ! option_checked){
+                    //     $("#"+model_name + "-correct").prop("checked", true)
+                    //     // $("#"+model_name + "-correct").prop("checked", false)
+                    // }else if(!model_checked && option_checked){
+                    //     // $("#"+model_name + "-check").prop("checked", true)
+                    //     $("#"+model_name + "-correct").prop("checked", false)
+                    //     $("#"+model_name + "-wrong").prop("checked", false)
+                    // }
+                    if(model_checked){
+                        $("#"+model_name + "-correct").prop("disabled", false)
+                        $("#"+model_name + "-wrong").prop("disabled", false)
+
+                    }else{
+                        $("#"+model_name + "-correct").prop("checked", false)
+                        $("#"+model_name + "-wrong").prop("checked", false)
+                        $("#"+model_name + "-correct").prop("disabled", true)
+                        $("#"+model_name + "-wrong").prop("disabled", true)
+                    }
+                })
+
+            }
+        }
+
+    $(document).ready(function(){
+        validate_checkbox();
+        $(".filter").change(function(){
+            validate_checkbox();
+        });
+    })
 
     var heatmap_data = {{!margins}};
-    console.log(heatmap_data);
 
     var myChart = echarts.init(document.getElementById('heatmap'));
     var xData = [...Array({{!total}}).keys()];

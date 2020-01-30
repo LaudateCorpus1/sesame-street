@@ -2,6 +2,7 @@ from bottle import route, run, template, static_file, request
 import bottle
 import os
 import json
+import math
 from collections import defaultdict
 from nn import *
 from config import *
@@ -12,9 +13,11 @@ app = application = bottle.Bottle()
 
 # pylint: disable=no-member
 
+app = application = bottle.Bottle()
 
 @app.route('/<filename:path>')
 def send_static(filename):
+    # print(filename, static_file(filename, root='static/'))
     return static_file(filename, root='static/')
 
 
@@ -30,7 +33,8 @@ def index():
         embedder="ai2",
         result={},
         total=0,
-        margins=[]
+        margins=[],
+        all="all"
     )
 
 
@@ -45,9 +49,12 @@ def retrieve():
     for model in ['roberta', 'bert', 'xlnet']:
         if request.forms.get(model, None) is not None:
             filters[model] = request.forms.get(model, None)
+        if request.forms.get(f"{model}-check", None) is not None:
+            filters[model] = filters.get(model, None)
+
     logger.info(f"Filters: {filters}")
 
-    order = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
+    order, flattened = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
 
     train_dataset, dev_dataset = load_dataset(task, order=order)
 
@@ -60,21 +67,24 @@ def retrieve():
     margins = heatmap(filters, task, order)
 
     result = {}
-    closest = get_closest(filters, task, embedder, order=order)
+    closest = get_closest(filters, task, embedder, order=flattened)
 
     for i, model in enumerate(filters):
         preds, probs, labels = load_predictions(predictions[model][task], order=order)
         for j, (pred, prob, label) in enumerate(zip(preds, probs, labels)):
+            # print(j)
             if j not in valid_indices: continue
             if j not in result:
                 result[j] = dev_dataset[j]
+            # print(closest[i][j * datasets[task]["num_choices"] + pred - datasets[task]["offset"]])
+            # print(j * datasets[task]["num_choices"] + pred - datasets[task]["offset"])
             result[j]["choices"][pred - datasets[task]["offset"]]["models"].append({
                 "model": model,
                 "margin": "-" if pred == label else prob[pred - datasets[task]["offset"]] - prob[label - datasets[task]["offset"]],
                 "closest": [
                     {
-                        "ctx": train_dataset[int(x) // datasets[task]["num_choices"]]["ctx"],
-                        "choice": train_dataset[int(x) // datasets[task]["num_choices"]]["choices"][int(x) % datasets[task]["num_choices"]]
+                        "ctx": train_dataset[math.floor(int(x) / datasets[task]["num_choices"])]["ctx"],
+                        "choice": train_dataset[math.floor(int(x) / datasets[task]["num_choices"])]["choices"][int(x) % datasets[task]["num_choices"]]
                     } for x in closest[i][j * datasets[task]["num_choices"] + pred - datasets[task]["offset"]]
                 ]
             })
@@ -91,8 +101,8 @@ def retrieve():
         result=result,
         total=len(dev_dataset),
         margins=margins,
+        all=request.forms.get("all")
     )
-
 
 def filtering(filters, task, order=None):
 
@@ -107,6 +117,8 @@ def filtering(filters, task, order=None):
             if pred == label and filters[model] == "correct":
                 model_indices.add(i)
             elif pred != label and filters[model] == "wrong":
+                model_indices.add(i)
+            elif filters[model] is None:
                 model_indices.add(i)
         valid_indices = model_indices if j == 0 else valid_indices.intersection(model_indices)
     return valid_indices
@@ -145,8 +157,13 @@ def get_order(filters, task):
     order = [i for i in range(len(margins[0]))]
     order = sorted(order, key=lambda j: sum(1 if c[j][-1] == '-' else 0 for c in margins))
 
-    return order
+    flatten_order = []
 
+    for x in order:
 
-if __name__ == '__main__':
-    bottle.run(app=app,host='0.0.0.0',port=80)
+        flatten_order.extend(list(range(x * datasets[task]["num_choices"], (x+1) * datasets[task]["num_choices"])))
+
+    return order, flatten_order
+
+if __name__ == "__main__":
+    run(app=app, host='localhost', port=7778, reloader=True)
