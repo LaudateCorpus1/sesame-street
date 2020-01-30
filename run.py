@@ -8,16 +8,17 @@ from config import *
 from loguru import logger
 
 bottle.TEMPLATE_PATH.insert(0, 'views')
+app = application = bottle.Bottle()
 
 # pylint: disable=no-member
 
 
-@route('/<filename:path>')
+@app.route('/<filename:path>')
 def send_static(filename):
     return static_file(filename, root='static/')
 
 
-@route('/', method='GET')
+@app.route('/', method='GET')
 def index():
     return template(
         'index.html',
@@ -33,7 +34,7 @@ def index():
     )
 
 
-@route('/', method='POST')
+@app.route('/', method='POST')
 def retrieve():
     logger.info(f"Request: {request.forms.__dict__}")
     task = request.forms.get('task')
@@ -146,5 +147,6 @@ def get_order(filters, task):
 
     return order
 
-if __name__ == "__main__":
-    run(host='localhost', port=7777, reloader=True)
+
+if __name__ == '__main__':
+    bottle.run(app=app,host='0.0.0.0',port=80)
