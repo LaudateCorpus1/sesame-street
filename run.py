@@ -23,34 +23,23 @@ def send_static(filename):
 
 @app.route('/', method='GET')
 def index():
-    return template(
-        'index.html',
-        tasks=['alphanli', 'hellaswag', 'physicaliqa', 'socialiqa'],
-        models=['roberta', 'bert', 'xlnet'],
-        embedders=['ai2', 'st'],
-        filters={},
-        task="alphanli",
-        embedder="ai2",
-        result={},
-        total=0,
-        margins=[],
-        all="all"
-    )
 
-
-@app.route('/', method='POST')
-def retrieve():
-    logger.info(f"Request: {request.forms.__dict__}")
-    task = request.forms.get('task')
-    embedder = request.forms.get('embedder')
+    task = "alphanli"
+    embedder = "ai2"
 
     filters = {}
 
     for model in ['roberta', 'bert', 'xlnet']:
-        if request.forms.get(model, None) is not None:
-            filters[model] = request.forms.get(model, None)
-        if request.forms.get(f"{model}-check", None) is not None:
-            filters[model] = filters.get(model, None)
+        correct = request.forms.get(f"{model}-correct", "correct")
+        wrong = request.forms.get(f"{model}-wrong", "wrong")
+
+        if correct and not wrong:
+            filters[model] = "correct"
+        elif correct and wrong:
+            filters[model] = None
+        elif not correct and wrong:
+            filters[model] = "wrong"
+
 
     logger.info(f"Filters: {filters}")
 
@@ -94,6 +83,7 @@ def retrieve():
         'index.html',
         tasks=['alphanli', 'hellaswag', 'physicaliqa', 'socialiqa'],
         models=['roberta', 'bert', 'xlnet'],
+        selected_models=['roberta', 'bert', 'xlnet'],
         embedders=['ai2', 'st'],
         filters=filters,
         task=task,
@@ -101,7 +91,79 @@ def retrieve():
         result=result,
         total=len(dev_dataset),
         margins=margins,
-        all=request.forms.get("all")
+    )
+
+
+@app.route('/', method='POST')
+def retrieve():
+    logger.info(f"Request: {request.forms.__dict__}")
+    task = request.forms.get('task')
+    embedder = request.forms.get('embedder')
+
+    filters = {}
+
+    for model in ['roberta', 'bert', 'xlnet']:
+        correct = request.forms.get(f"{model}-correct", None)
+        wrong = request.forms.get(f"{model}-wrong", None)
+
+        if correct and not wrong:
+            filters[model] = "correct"
+        elif correct and wrong:
+            filters[model] = None
+        elif not correct and wrong:
+            filters[model] = "wrong"
+
+
+    logger.info(f"Filters: {filters}")
+
+    order, flattened = get_order(filters or {m: None for m in ['roberta', 'bert', 'xlnet']}, task)
+
+    train_dataset, dev_dataset = load_dataset(task, order=order)
+
+    if filters == {}:
+        filters = {m: None for m in ['roberta', 'bert', 'xlnet']}
+        valid_indices = list(range(len(dev_dataset)))
+    else:
+        valid_indices = filtering(filters, task, order=order)
+
+    margins = heatmap(filters, task, order)
+
+    result = {}
+    closest = get_closest(filters, task, embedder, order=flattened)
+
+    for i, model in enumerate(filters):
+        preds, probs, labels = load_predictions(predictions[model][task], order=order)
+        for j, (pred, prob, label) in enumerate(zip(preds, probs, labels)):
+            # print(j)
+            if j not in valid_indices: continue
+            if j not in result:
+                result[j] = dev_dataset[j]
+            # print(closest[i][j * datasets[task]["num_choices"] + pred - datasets[task]["offset"]])
+            # print(j * datasets[task]["num_choices"] + pred - datasets[task]["offset"])
+            result[j]["choices"][pred - datasets[task]["offset"]]["models"].append({
+                "model": model,
+                "margin": "-" if pred == label else prob[pred - datasets[task]["offset"]] - prob[label - datasets[task]["offset"]],
+                "closest": [
+                    {
+                        "ctx": train_dataset[math.floor(int(x) / datasets[task]["num_choices"])]["ctx"],
+                        "choice": train_dataset[math.floor(int(x) / datasets[task]["num_choices"])]["choices"][int(x) % datasets[task]["num_choices"]]
+                    } for x in closest[i][j * datasets[task]["num_choices"] + pred - datasets[task]["offset"]]
+                ]
+            })
+
+
+    return template(
+        'index.html',
+        tasks=['alphanli', 'hellaswag', 'physicaliqa', 'socialiqa'],
+        models=['roberta', 'bert', 'xlnet'],
+        selected_models=list(filters.keys()),
+        embedders=['ai2', 'st'],
+        filters=filters,
+        task=task,
+        embedder=embedder,
+        result=result,
+        total=len(dev_dataset),
+        margins=margins,
     )
 
 def filtering(filters, task, order=None):
@@ -166,4 +228,4 @@ def get_order(filters, task):
     return order, flatten_order
 
 if __name__ == "__main__":
-    run(app=app, host='localhost', port=7778, reloader=True)
+    run(app=app, host='localhost', port=80, reloader=True)
